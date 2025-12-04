@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# QGIS
+*.qgs~
+*.qgs.backup
+*.pyc
+
+# Output data directory
+KN/
+*.geojson
+*.gpkg
+
+# IDE and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.claude/
+
+# Development and testing
+PROGRESS.md
+*.log
+
+# OS
+Thumbs.db
+.directory
+
+# Plugin builder / deployment
+pb_tool.cfg
+*.zip

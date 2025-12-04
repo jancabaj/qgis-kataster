@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/plugins/kataster" >
+        <file>icon.png</file>
+        <file>zbgis_icon.png</file>
+    </qresource>
+</RCC>
