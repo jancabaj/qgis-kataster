@@ -10,7 +10,7 @@ A QGIS plugin for loading cadastral parcel data from the official Slovak Cadastr
   - Cadastral Parcels - E Register
   - Cadastral Zoning (boundaries)
 - Configurable output folder with persistent settings
-- Optional coordinate transformation from EPSG:4258 to EPSG:5514 (S-JTSK Krovak)
+- Optional coordinate transformation from EPSG:4326 to EPSG:5514 (S-JTSK Krovak)
 - Automatic merging of layers into single GeoPackage
 - Pre-configured styling for all layers
 - Automatic handling of corrupt coordinate data
