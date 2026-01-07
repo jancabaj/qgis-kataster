@@ -50,7 +50,7 @@ UI_FILES = kataster_dialog_base.ui
 
 EXTRAS = metadata.txt icon.png zbgis_icon.png resources.qrc LICENSE README.md
 
-EXTRA_DIRS = api data styles
+EXTRA_DIRS = api data styles proj
 
 COMPILED_RESOURCE_FILES = resources.py
 
