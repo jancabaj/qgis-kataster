@@ -234,6 +234,17 @@ class kataster:
         self.settings = QSettings()
         self.settings_key = 'kataster/output_path'
 
+        # Add plugin's proj directory to PROJ search path for bundled grid file
+        proj_dir = os.path.join(self.plugin_dir, 'proj')
+        if os.path.exists(proj_dir):
+            current_proj_data = os.environ.get('PROJ_DATA', '')
+            if proj_dir not in current_proj_data:
+                if current_proj_data:
+                    os.environ['PROJ_DATA'] = f"{proj_dir}{os.pathsep}{current_proj_data}"
+                else:
+                    os.environ['PROJ_DATA'] = proj_dir
+                QgsMessageLog.logMessage(f"Using bundled grid file from: {proj_dir}", "Kataster", Qgis.Info)
+
     def get_default_output_path(self):
         """Get default output path (KN directory inside plugin folder)"""
         default_path = os.path.join(self.plugin_dir, "KN")
@@ -326,8 +337,8 @@ class kataster:
         # Get source CRS
         source_crs = layer.crs()
         if not source_crs.isValid():
-            source_crs = QgsCoordinateReferenceSystem('EPSG:4258')
-            QgsMessageLog.logMessage(f"  ⚠ Source CRS not defined, assuming EPSG:4258", "Kataster", Qgis.Warning)
+            source_crs = QgsCoordinateReferenceSystem('EPSG:4326')
+            QgsMessageLog.logMessage(f"  ⚠ Source CRS not defined, assuming EPSG:4326", "Kataster", Qgis.Warning)
 
         # Create memory layer with same geometry type
         geom_type = layer.geometryType()
@@ -360,7 +371,7 @@ class kataster:
 
             bbox = geom.boundingBox()
 
-            # Check for swapped coordinates (X > 40 and Y < 40 in EPSG:4258)
+            # Check for swapped coordinates (X > 40 and Y < 40 in geographic CRS)
             # Normal Slovak coordinates: X (longitude) ~17-22°, Y (latitude) ~47-49°
             if bbox.xMinimum() > 40 and bbox.yMaximum() < 40:
                 # Swap X and Y coordinates
@@ -426,17 +437,44 @@ class kataster:
                     QgsMessageLog.logMessage(f"Warning: Could not remove existing GPKG: {e}", "Kataster", Qgis.Warning)
                     return False
 
-            # Source CRS - Slovak cadastre data is in EPSG:4258 (ETRS89)
-            source_crs = QgsCoordinateReferenceSystem('EPSG:4258')
+            # Source CRS - Slovak cadastre API serves data in EPSG:4326 (WGS84)
+            # GeoJSON from the API has no explicit CRS, defaults to EPSG:4326
+            source_crs = QgsCoordinateReferenceSystem('EPSG:4326')
             transform_context = QgsProject.instance().transformContext()
 
             # Determine target CRS based on transformation option
             if transform_to_5514:
                 target_crs = QgsCoordinateReferenceSystem('EPSG:5514')
-                QgsMessageLog.logMessage(f"CRS transformation enabled: EPSG:4258 → EPSG:5514", "Kataster", Qgis.Info)
+
+                # Set explicit coordinate operation for EPSG:4326 -> EPSG:5514 transformation
+                # Using official Slovak geodesy transformation with grid shift
+                # This is the official transformation from Slovak government (GKU)
+                proj_string = ("+proj=pipeline "
+                               "+step +proj=unitconvert +xy_in=deg +xy_out=rad "
+                               "+step +proj=push +v_3 "
+                               "+step +proj=cart +ellps=WGS84 "
+                               "+step +inv +proj=helmert +x=485.021 +y=169.465 +z=483.839 "
+                               "+rx=-7.786342 +ry=-4.397554 +rz=-4.102655 +s=0 +convention=coordinate_frame "
+                               "+step +inv +proj=cart +ellps=bessel "
+                               "+step +proj=pop +v_3 "
+                               "+step +proj=krovak +lat_0=49.5 +lon_0=24.8333333333333 "
+                               "+alpha=30.2881397527778 +k=0.9999 +x_0=0 +y_0=0 +ellps=bessel "
+                               "+step +inv +proj=krovak +lat_0=49.5 +lon_0=24.8333333333333 "
+                               "+alpha=30.2881397527778 +k=0.9999 +x_0=0 +y_0=0 +ellps=bessel "
+                               "+step +proj=hgridshift +grids=sk_gku_JTSK03_to_JTSK.tif "
+                               "+step +proj=krovak +lat_0=49.5 +lon_0=24.8333333333333 "
+                               "+alpha=30.2881397527778 +k=0.9999 +x_0=0 +y_0=0 +ellps=bessel")
+
+                # Try to set the coordinate operation explicitly
+                try:
+                    transform_context.addCoordinateOperation(source_crs, target_crs, proj_string)
+                    QgsMessageLog.logMessage(f"CRS transformation enabled: EPSG:4326 → EPSG:5514 (using official SK GKU transformation)", "Kataster", Qgis.Info)
+                except Exception as e:
+                    QgsMessageLog.logMessage(f"Could not set explicit coordinate operation, using default: {e}", "Kataster", Qgis.Warning)
+                    QgsMessageLog.logMessage(f"CRS transformation enabled: EPSG:4326 → EPSG:5514 (default)", "Kataster", Qgis.Info)
             else:
                 target_crs = source_crs
-                QgsMessageLog.logMessage(f"Keeping original CRS: EPSG:4258", "Kataster", Qgis.Info)
+                QgsMessageLog.logMessage(f"Keeping original CRS: EPSG:4326", "Kataster", Qgis.Info)
 
             # Define layer configurations
             layer_configs = []

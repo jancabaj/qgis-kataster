@@ -6,11 +6,24 @@
 name=Kataster SR
 qgisMinimumVersion=3.0
 description=Load cadastral parcels from Slovak Cadastre via OGC API
-version=0.1
+version=0.12
 author=jancabaj
 email=jan807931@gmail.com
 
-about=Plugin for loading cadastral parcel data from the official Slovak Cadastre OGC Features API. Supports C Register, E Register, and Cadastral Zoning layers. Enter a cadastre name (e.g., "Nitra") or 6-digit code to download and visualize data in QGIS. Features automatic coordinate transformation to S-JTSK and corrupt data handling.
+about=Plugin ma 2 funkcie - 1. stahuje kataster do GPKG / 2. otvori kataster v prehliadaci podla aktualnych suradnic v QGIS
+ staci zadat nazov alebo kod KÚ a stiahne vrstvy podla vyberu, pripadne transformuje do 5514 - ulozi GPKG do zvoleneho adresara
+ presnost sub 1 cm (tak ako INSPIRE GML, zdroj je EPSG 4326)
+ stahuje z INSPIRE OGC API, ktore je podla VÚGK v overovacej prevadzke a preto je plugin v sekcii experimentalne
+
+ z mojich testov su problematicke zial prave parcely C, niekedy to funguje na druhy, treti pokus ale niektore obce, najma vacsie mesta mi stiahlo iba parcely E a hranicu KÚ, pripadne ani to
+ ak by chcel niekto ine styly na stiahnute vrstvy staci prepisat qml subory v adresari pluginu svojimi vlastnymi
+
+ Za data dakujeme: © VÚGK (Výskumný ústav geodézie a kartografie v Bratislave), INSPIRE ukladacie služby
+
+ NOVINKA v0.12: Plugin uz obsahuje vlastnu transformaciu EPSG:4326 -> EPSG:5514 s oficialnou SK GKU transformaciou a grid suborom.
+ Transformacia funguje automaticky pri zatrhnuti "Transform to EPSG:5514" - nie je potrebne nastavovat QGIS manualne!
+
+ Support creator at: https://ko-fi.com/jancabaj
 
 tracker=https://github.com/jancabaj/qgis-kataster/issues
 repository=https://github.com/jancabaj/qgis-kataster
@@ -20,7 +33,8 @@ repository=https://github.com/jancabaj/qgis-kataster
 
 hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
-# changelog=
+changelog=0.12 - Fixed coordinate accuracy issue: Changed source CRS from EPSG:4258 to EPSG:4326, bundled official SK GKU transformation with grid file (sk_gku_JTSK03_to_JTSK.tif), plugin now works independently without manual QGIS transformation setup
+    0.11 - Previous version
 
 # Tags are comma separated with spaces allowed
 tags=cadastre, slovakia, zbgis, parcels, vector, ogc
