@@ -39,3 +39,17 @@ Thumbs.db
 # Plugin builder / deployment
 pb_tool.cfg
 *.zip
+plugin_upload.py
+scripts/
+pylintrc
+
+# Testing
+test/
+
+# Generated/alternative files
+README.html
+README.txt
+help/
+i18n/
+zbgis_icon.svg
+zbgis_icon_alt.png
