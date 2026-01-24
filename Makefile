@@ -38,13 +38,19 @@ LOCALES =
 # translation
 SOURCES = \
 	__init__.py \
-	kataster.py kataster_dialog.py
+	kataster.py \
+	kataster_dialog.py \
+	workers.py \
+	gpkg_utils.py
 
 PLUGINNAME = kataster
 
 PY_FILES = \
 	__init__.py \
-	kataster.py kataster_dialog.py
+	kataster.py \
+	kataster_dialog.py \
+	workers.py \
+	gpkg_utils.py
 
 UI_FILES = kataster_dialog_base.ui
 

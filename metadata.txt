@@ -6,7 +6,7 @@
 name=Kataster SR
 qgisMinimumVersion=3.0
 description=Load cadastral parcels from Slovak Cadastre via OGC API
-version=0.12
+version=0.13
 author=jancabaj
 email=jan807931@gmail.com
 
@@ -21,7 +21,7 @@ about=Plugin ma 2 funkcie - 1. stahuje kataster do GPKG / 2. otvori kataster v p
  Za data dakujeme: © VÚGK (Výskumný ústav geodézie a kartografie v Bratislave), INSPIRE ukladacie služby
 
  NOVINKA v0.12: Plugin uz obsahuje vlastnu transformaciu EPSG:4326 -> EPSG:5514 s oficialnou SK GKU transformaciou a grid suborom.
- Transformacia funguje automaticky pri zatrhnuti "Transform to EPSG:5514" - nie je potrebne nastavovat QGIS manualne!
+ Transformacia funguje automaticky pri zaznaceni "Transform to EPSG:5514" - nie je potrebne nastavovat v QGIS manualne!
 
  Support creator at: https://ko-fi.com/jancabaj
 
@@ -33,7 +33,8 @@ repository=https://github.com/jancabaj/qgis-kataster
 
 hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
-changelog=0.12 - Fixed coordinate accuracy issue: Changed source CRS from EPSG:4258 to EPSG:4326, bundled official SK GKU transformation with grid file (sk_gku_JTSK03_to_JTSK.tif), plugin now works independently without manual QGIS transformation setup
+changelog=0.13 - New QLineEdit to set custom output file name before downloading, added ESRI compatible WKT parameters, fixed Windows temp file cleanup using VSIMEM
+    0.12 - Fixed coordinate accuracy issue: Changed source CRS from EPSG:4258 to EPSG:4326, bundled official SK GKU transformation with grid file (sk_gku_JTSK03_to_JTSK.tif), plugin now works independently without manual QGIS transformation setup
     0.11 - Previous version
 
 # Tags are comma separated with spaces allowed
