@@ -20,6 +20,9 @@ about=Plugin ma 2 funkcie - 1. stahuje kataster do GPKG / 2. otvori kataster v p
 
  Za data dakujeme: © VÚGK (Výskumný ústav geodézie a kartografie v Bratislave), INSPIRE ukladacie služby
 
+ NOVINKA v0.13: Možnosť sťahovať celý okres alebo kraj naraz, filter na sťahnuté katastrálne územia v nástrojovej lište,
+ režim pridávania do existujúceho GPKG súboru, vlastné meno výstupného súboru.
+
  NOVINKA v0.12: Plugin uz obsahuje vlastnu transformaciu EPSG:4326 -> EPSG:5514 s oficialnou SK GKU transformaciou a grid suborom.
  Transformacia funguje automaticky pri zaznaceni "Transform to EPSG:5514" - nie je potrebne nastavovat v QGIS manualne!
 
