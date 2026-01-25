@@ -249,6 +249,296 @@ def update_gpkg_crs_for_ESRI(gpkg_path):
         QgsMessageLog.logMessage(f"  Warning: Could not update CRS for ESRI: {e}", "Kataster", Qgis.Warning)
 
 
+def _delete_cadastre_features(gpkg_path, cadastre_codes):
+    """
+    Delete existing features for the given cadastre codes from all layers.
+
+    This prevents duplicates when re-downloading the same cadastre.
+    """
+    try:
+        conn = sqlite3.connect(gpkg_path)
+        cursor = conn.cursor()
+
+        deleted_counts = {'ParcelC': 0, 'ParcelE': 0, 'CadastralUnit': 0}
+
+        for code, name in cadastre_codes:
+            # Delete from ParcelC (nationalCadastralReference LIKE 'code_%')
+            try:
+                cursor.execute(f"DELETE FROM ParcelC WHERE nationalCadastralReference LIKE '{code}_%'")
+                deleted_counts['ParcelC'] += cursor.rowcount
+            except sqlite3.OperationalError:
+                pass  # Table doesn't exist yet
+
+            # Delete from ParcelE (nationalCadastralReference LIKE 'code_%')
+            try:
+                cursor.execute(f"DELETE FROM ParcelE WHERE nationalCadastralReference LIKE '{code}_%'")
+                deleted_counts['ParcelE'] += cursor.rowcount
+            except sqlite3.OperationalError:
+                pass  # Table doesn't exist yet
+
+            # Delete from CadastralUnit (nationalCadastalZoningReference = 'code')
+            # Note: API has typo "Cadastal" instead of "Cadastral"
+            try:
+                cursor.execute(f"DELETE FROM CadastralUnit WHERE nationalCadastalZoningReference = '{code}'")
+                deleted_counts['CadastralUnit'] += cursor.rowcount
+            except sqlite3.OperationalError:
+                pass  # Table doesn't exist yet
+
+        conn.commit()
+        conn.close()
+
+        # Log deletions
+        total_deleted = sum(deleted_counts.values())
+        if total_deleted > 0:
+            QgsMessageLog.logMessage(f"Removed existing features for re-download:", "Kataster", Qgis.Info)
+            for layer_name, count in deleted_counts.items():
+                if count > 0:
+                    QgsMessageLog.logMessage(f"  - {layer_name}: {count} features", "Kataster", Qgis.Info)
+
+        return True
+    except Exception as e:
+        QgsMessageLog.logMessage(f"Warning: Could not delete existing features: {e}", "Kataster", Qgis.Warning)
+        return False
+
+
+def _ensure_metadata_table(gpkg_path):
+    """Create metadata table for tracking downloaded cadastres if it doesn't exist."""
+    try:
+        conn = sqlite3.connect(gpkg_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS _downloaded_cadastres (
+                code TEXT PRIMARY KEY,
+                name TEXT,
+                downloaded_at TEXT,
+                parcel_c_count INTEGER DEFAULT 0,
+                parcel_e_count INTEGER DEFAULT 0,
+                zoning_count INTEGER DEFAULT 0
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        QgsMessageLog.logMessage(f"Warning: Could not create metadata table: {e}", "Kataster", Qgis.Warning)
+        return False
+
+
+def _update_metadata(gpkg_path, cadastre_codes, layer_counts):
+    """Update metadata table with downloaded cadastres."""
+    try:
+        from datetime import datetime
+        conn = sqlite3.connect(gpkg_path)
+        cursor = conn.cursor()
+
+        for code, name in cadastre_codes:
+            cursor.execute('''
+                INSERT OR REPLACE INTO _downloaded_cadastres
+                (code, name, downloaded_at, parcel_c_count, parcel_e_count, zoning_count)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                code,
+                name or '',
+                datetime.now().isoformat(),
+                layer_counts.get('parcel_c', {}).get(code, 0),
+                layer_counts.get('parcel_e', {}).get(code, 0),
+                layer_counts.get('zoning', {}).get(code, 0)
+            ))
+
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        QgsMessageLog.logMessage(f"Warning: Could not update metadata: {e}", "Kataster", Qgis.Warning)
+        return False
+
+
+def get_gpkg_cadastre_summary(gpkg_path):
+    """Get summary of cadastres in a GPKG file."""
+    try:
+        if not os.path.exists(gpkg_path):
+            return None
+
+        conn = sqlite3.connect(gpkg_path)
+        cursor = conn.cursor()
+
+        # Check if metadata table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='_downloaded_cadastres'")
+        if not cursor.fetchone():
+            conn.close()
+            return None
+
+        cursor.execute('SELECT COUNT(*) FROM _downloaded_cadastres')
+        cadastre_count = cursor.fetchone()[0]
+
+        cursor.execute('SELECT SUM(parcel_c_count + parcel_e_count + zoning_count) FROM _downloaded_cadastres')
+        total_features = cursor.fetchone()[0] or 0
+
+        conn.close()
+        return {'cadastres': cadastre_count, 'features': total_features}
+    except Exception:
+        return None
+
+
+def get_gpkg_cadastre_list(gpkg_path):
+    """Get list of cadastres in a GPKG file for filtering.
+
+    Returns:
+        List of (code, name) tuples sorted by name, or empty list if not available.
+    """
+    try:
+        if not os.path.exists(gpkg_path):
+            return []
+
+        conn = sqlite3.connect(gpkg_path)
+        cursor = conn.cursor()
+
+        # Check if metadata table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='_downloaded_cadastres'")
+        if not cursor.fetchone():
+            conn.close()
+            return []
+
+        cursor.execute('SELECT code, name FROM _downloaded_cadastres ORDER BY name')
+        results = cursor.fetchall()
+        conn.close()
+
+        return [(row[0], row[1]) for row in results]
+    except Exception:
+        return []
+
+
+def _append_layer_to_gpkg(layer, gpkg_path, layer_name, target_crs, transform_context, transform_to_5514):
+    """Append features from a layer to an existing GPKG layer (or create if doesn't exist)."""
+    save_options = QgsVectorFileWriter.SaveVectorOptions()
+    save_options.driverName = 'GPKG'
+    save_options.fileEncoding = 'UTF-8'
+    save_options.layerName = layer_name
+    save_options.layerOptions = ['SPATIAL_INDEX=YES']
+
+    if transform_to_5514:
+        save_options.ct = QgsCoordinateTransform(layer.crs(), target_crs, transform_context)
+
+    # Check if GPKG exists
+    if os.path.exists(gpkg_path):
+        # Check if layer exists in GPKG
+        ds = gdal.OpenEx(gpkg_path, gdal.OF_VECTOR)
+        layer_exists = False
+        if ds:
+            for i in range(ds.GetLayerCount()):
+                if ds.GetLayerByIndex(i).GetName() == layer_name:
+                    layer_exists = True
+                    break
+            ds = None
+
+        if layer_exists:
+            # Append to existing layer
+            save_options.actionOnExistingFile = QgsVectorFileWriter.AppendToLayerNoNewFields
+        else:
+            # Create new layer in existing GPKG
+            save_options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
+    else:
+        # Create new GPKG
+        save_options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteFile
+
+    error = QgsVectorFileWriter.writeAsVectorFormatV3(layer, gpkg_path, transform_context, save_options)
+
+    if error[0] != QgsVectorFileWriter.NoError:
+        QgsMessageLog.logMessage(f"ERROR: Failed to append {layer_name}: {error[1]}", "Kataster", Qgis.Critical)
+        return False
+
+    return True
+
+
+def append_to_gpkg(vsimem_files, output_gpkg, cadastre_codes, plugin_dir, transform_to_5514=False):
+    """
+    Append features to an existing GPKG, removing duplicates first.
+
+    Args:
+        vsimem_files: List of /vsimem/ paths with GeoJSON data
+        output_gpkg: Path to the GPKG file (will be created if doesn't exist)
+        cadastre_codes: List of (code, name) tuples being downloaded
+        plugin_dir: Plugin directory for styles
+        transform_to_5514: Whether to transform to EPSG:5514
+    """
+    try:
+        gpkg_exists = os.path.exists(output_gpkg)
+
+        # Delete existing features for these cadastres (if GPKG exists)
+        if gpkg_exists:
+            _delete_cadastre_features(output_gpkg, cadastre_codes)
+
+        # Set up CRS transformation
+        source_crs, target_crs, transform_context = _setup_transform_context(transform_to_5514)
+
+        # Build layer configs
+        layer_configs = _build_layer_configs(vsimem_files)
+        if not layer_configs:
+            QgsMessageLog.logMessage("No valid data to append", "Kataster", Qgis.Warning)
+            return False
+
+        # Track feature counts per cadastre per layer (for metadata)
+        layer_counts = {'parcel_c': {}, 'parcel_e': {}, 'zoning': {}}
+
+        # Process each layer
+        is_first_layer = not gpkg_exists
+        for config in layer_configs:
+            QgsMessageLog.logMessage(f"Appending {config['layer_name']}...", "Kataster", Qgis.Info)
+
+            layer = QgsVectorLayer(config['vsimem_path'], config['layer_name'], "ogr")
+            if not layer.isValid():
+                QgsMessageLog.logMessage(f"ERROR: Could not load {config['vsimem_path']}", "Kataster", Qgis.Critical)
+                continue
+
+            feature_count = layer.featureCount()
+            QgsMessageLog.logMessage(f"  Loaded {feature_count} features", "Kataster", Qgis.Info)
+
+            # Fix swapped coordinates for parcel layers
+            if config['layer_name'] in ['ParcelC', 'ParcelE']:
+                layer = fix_swapped_coordinates(layer, config['layer_name'])
+
+            # For first layer on new GPKG, use create mode
+            if is_first_layer:
+                if not _write_layer_to_gpkg(layer, output_gpkg, config['layer_name'],
+                                            target_crs, transform_context, transform_to_5514, True):
+                    return False
+                is_first_layer = False
+            else:
+                if not _append_layer_to_gpkg(layer, output_gpkg, config['layer_name'],
+                                             target_crs, transform_context, transform_to_5514):
+                    return False
+
+            QgsMessageLog.logMessage(f"  ✓ {config['layer_name']} appended ({feature_count} features)", "Kataster", Qgis.Success)
+
+            # Apply style (will create default style if not exists)
+            apply_style_to_gpkg_layer(output_gpkg, config['layer_name'], config['qml'], plugin_dir)
+
+            # Track counts per cadastre (approximate - divide evenly if multiple cadastres)
+            layer_type = [k for k, v in _LAYER_CONFIG.items() if v[0] == config['layer_name']][0].strip('_')
+            per_cadastre = feature_count // len(cadastre_codes) if cadastre_codes else 0
+            for code, _ in cadastre_codes:
+                layer_counts[layer_type][code] = per_cadastre
+
+        # Update CRS for ESRI compatibility
+        if transform_to_5514:
+            update_gpkg_crs_for_ESRI(output_gpkg)
+
+        # Update metadata table
+        _ensure_metadata_table(output_gpkg)
+        _update_metadata(output_gpkg, cadastre_codes, layer_counts)
+
+        return True
+
+    except Exception as e:
+        import traceback
+        QgsMessageLog.logMessage(f"ERROR during GPKG append: {traceback.format_exc()}", "Kataster", Qgis.Critical)
+        return False
+    finally:
+        # Clean up /vsimem/ files
+        for vsimem_path in vsimem_files:
+            gdal.Unlink(vsimem_path)
+
+
 def convert_vsimem_to_gpkg(vsimem_files, output_gpkg, plugin_dir, transform_to_5514=False):
     """Convert /vsimem/ GeoJSON data to a single GeoPackage with multiple layers."""
     try:

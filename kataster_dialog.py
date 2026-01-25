@@ -26,6 +26,9 @@ import os
 
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
+from qgis.PyQt.QtWidgets import QButtonGroup
+
+from .api.download_cadastre import get_unique_okresy, get_unique_kraje
 
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
@@ -33,6 +36,15 @@ FORM_CLASS, _ = uic.loadUiType(os.path.join(
 
 
 class katasterDialog(QtWidgets.QDialog, FORM_CLASS):
+    # Selection mode constants
+    MODE_CADASTRE = 0
+    MODE_OKRES = 1
+    MODE_KRAJ = 2
+
+    # Output mode constants
+    OUTPUT_NEW_FILE = 0
+    OUTPUT_APPEND = 1
+
     def __init__(self, parent=None):
         """Constructor."""
         super(katasterDialog, self).__init__(parent)
@@ -42,3 +54,101 @@ class katasterDialog(QtWidgets.QDialog, FORM_CLASS):
         # http://qt-project.org/doc/qt-4.8/designer-using-a-ui-file.html
         # #widgets-and-dialogs-with-auto-connect
         self.setupUi(self)
+
+        # Create button group for selection mode radio buttons
+        self.selection_mode_group = QButtonGroup(self)
+        self.selection_mode_group.addButton(self.radio_cadastre, self.MODE_CADASTRE)
+        self.selection_mode_group.addButton(self.radio_okres, self.MODE_OKRES)
+        self.selection_mode_group.addButton(self.radio_kraj, self.MODE_KRAJ)
+
+        # Create button group for output mode radio buttons
+        self.output_mode_group = QButtonGroup(self)
+        self.output_mode_group.addButton(self.radio_new_file, self.OUTPUT_NEW_FILE)
+        self.output_mode_group.addButton(self.radio_append_file, self.OUTPUT_APPEND)
+
+        # Connect radio button signals
+        self.radio_cadastre.toggled.connect(self._on_selection_mode_changed)
+        self.radio_okres.toggled.connect(self._on_selection_mode_changed)
+        self.radio_kraj.toggled.connect(self._on_selection_mode_changed)
+
+        # Connect output mode radio button signals
+        self.radio_new_file.toggled.connect(self._on_output_mode_changed)
+        self.radio_append_file.toggled.connect(self._on_output_mode_changed)
+
+        # Populate combo boxes
+        self._populate_combos()
+
+    def _populate_combos(self):
+        """Populate okres and kraj combo boxes."""
+        # Get plugin directory for loading CSV
+        plugin_dir = os.path.dirname(__file__)
+        api_dir = os.path.join(plugin_dir, 'api')
+
+        # Populate okres combo
+        okresy = get_unique_okresy(api_dir)
+        self.okres_combo.clear()
+        self.okres_combo.addItems(okresy)
+
+        # Populate kraj combo
+        kraje = get_unique_kraje(api_dir)
+        self.kraj_combo.clear()
+        self.kraj_combo.addItems(kraje)
+
+    def _on_selection_mode_changed(self):
+        """Handle selection mode radio button changes."""
+        mode = self.get_selection_mode()
+
+        # Enable/disable inputs based on selection mode
+        self.cadastre_input.setEnabled(mode == self.MODE_CADASTRE)
+        self.okres_combo.setEnabled(mode == self.MODE_OKRES)
+        self.kraj_combo.setEnabled(mode == self.MODE_KRAJ)
+
+    def _on_output_mode_changed(self):
+        """Handle output mode radio button changes."""
+        mode = self.get_output_mode()
+
+        # Enable/disable inputs based on output mode
+        is_new_file = (mode == self.OUTPUT_NEW_FILE)
+        is_append = (mode == self.OUTPUT_APPEND)
+
+        # New file mode inputs
+        self.output_path_input.setEnabled(is_new_file)
+        self.browse_button.setEnabled(is_new_file)
+        self.filename_input.setEnabled(is_new_file)
+        self.label_filename.setEnabled(is_new_file)
+
+        # Append mode inputs
+        self.append_file_input.setEnabled(is_append)
+        self.browse_append_button.setEnabled(is_append)
+
+    def get_selection_mode(self):
+        """Get the current selection mode.
+
+        Returns:
+            MODE_CADASTRE, MODE_OKRES, or MODE_KRAJ
+        """
+        return self.selection_mode_group.checkedId()
+
+    def get_output_mode(self):
+        """Get the current output mode.
+
+        Returns:
+            OUTPUT_NEW_FILE or OUTPUT_APPEND
+        """
+        return self.output_mode_group.checkedId()
+
+    def get_selected_okres(self):
+        """Get the currently selected okres name."""
+        return self.okres_combo.currentText()
+
+    def get_selected_kraj(self):
+        """Get the currently selected kraj name."""
+        return self.kraj_combo.currentText()
+
+    def get_append_file_path(self):
+        """Get the path to the GPKG file to append to."""
+        return self.append_file_input.text()
+
+    def set_append_file_path(self, path):
+        """Set the path to the GPKG file to append to."""
+        self.append_file_input.setText(path)

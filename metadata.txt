@@ -33,7 +33,7 @@ repository=https://github.com/jancabaj/qgis-kataster
 
 hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
-changelog=0.13 - New QLineEdit to set custom output file name before downloading, added ESRI compatible WKT parameters, fixed Windows temp file cleanup using VSIMEM
+changelog=0.13 - Added okres/kraj download (download entire districts or regions), toolbar filter for downloaded cadastres, append mode to add cadastres to existing GPKG, custom output filename, ESRI compatible WKT, fixed Windows temp file cleanup, code refactored for better maintainability
     0.12 - Fixed coordinate accuracy issue: Changed source CRS from EPSG:4258 to EPSG:4326, bundled official SK GKU transformation with grid file (sk_gku_JTSK03_to_JTSK.tif), plugin now works independently without manual QGIS transformation setup
     0.11 - Previous version
 

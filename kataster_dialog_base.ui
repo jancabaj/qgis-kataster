@@ -6,12 +6,12 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>441</width>
-    <height>355</height>
+    <width>500</width>
+    <height>520</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>kataster</string>
+   <string>Kataster SR</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <property name="spacing">
@@ -32,40 +32,107 @@
    <item>
     <widget class="QGroupBox" name="inputGroup">
      <property name="title">
-      <string>Input</string>
+      <string>Selection</string>
      </property>
-     <layout class="QFormLayout" name="inputFormLayout">
-      <property name="horizontalSpacing">
-       <number>12</number>
+     <layout class="QVBoxLayout" name="inputVerticalLayout">
+      <property name="spacing">
+       <number>8</number>
       </property>
-      <property name="verticalSpacing">
-       <number>10</number>
+      <item>
+       <layout class="QHBoxLayout" name="cadastreLayout">
+        <item>
+         <widget class="QRadioButton" name="radio_cadastre">
+          <property name="text">
+           <string>Cadastral Unit</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="cadastre_input">
+          <property name="placeholderText">
+           <string>Enter name or code (e.g. Nitra or 815713)</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="okresLayout">
+        <item>
+         <widget class="QRadioButton" name="radio_okres">
+          <property name="text">
+           <string>Okres (District)</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="okres_combo">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="krajLayout">
+        <item>
+         <widget class="QRadioButton" name="radio_kraj">
+          <property name="text">
+           <string>Kraj (Region)</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="kraj_combo">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="outputGroup">
+     <property name="title">
+      <string>Output</string>
+     </property>
+     <layout class="QVBoxLayout" name="outputVerticalLayout">
+      <property name="spacing">
+       <number>8</number>
       </property>
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_cadastre">
+      <item>
+       <widget class="QRadioButton" name="radio_new_file">
         <property name="text">
-         <string>Cadastre:</string>
+         <string>Create new file</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
-      <item row="0" column="1">
-       <widget class="QLineEdit" name="cadastre_input">
-        <property name="placeholderText">
-         <string>Enter name or code (e.g. Nitra or 815713)</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_output_path">
-        <property name="text">
-         <string>Output folder:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <layout class="QHBoxLayout" name="pathLayout">
-        <property name="spacing">
-         <number>8</number>
+      <item>
+       <layout class="QHBoxLayout" name="newFileLayout">
+        <property name="leftMargin">
+         <number>20</number>
         </property>
         <item>
          <widget class="QLineEdit" name="output_path_input">
@@ -86,22 +153,66 @@
         </item>
        </layout>
       </item>
-      <item row="2" column="0">
-       <widget class="QLabel" name="label_filename">
+      <item>
+       <layout class="QHBoxLayout" name="filenameLayout">
+        <property name="leftMargin">
+         <number>20</number>
+        </property>
+        <item>
+         <widget class="QLabel" name="label_filename">
+          <property name="text">
+           <string>Filename:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="filename_input">
+          <property name="toolTip">
+           <string>Custom filename (without .gpkg extension). Leave empty for auto-generated name.</string>
+          </property>
+          <property name="placeholderText">
+           <string>Leave empty for auto name</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="radio_append_file">
         <property name="text">
-         <string>Output filename:</string>
+         <string>Append to existing file</string>
         </property>
        </widget>
       </item>
-      <item row="2" column="1">
-       <widget class="QLineEdit" name="filename_input">
-        <property name="toolTip">
-         <string>Custom filename (without .gpkg extension). Leave empty for auto-generated name (cadastralcode_cadastralname)</string>
+      <item>
+       <layout class="QHBoxLayout" name="appendFileLayout">
+        <property name="leftMargin">
+         <number>20</number>
         </property>
-        <property name="placeholderText">
-         <string>Leave empty for auto (code_name)</string>
-        </property>
-       </widget>
+        <item>
+         <widget class="QLineEdit" name="append_file_input">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+          <property name="placeholderText">
+           <string>Select GPKG file to append to...</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="browse_append_button">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
+          <property name="text">
+           <string>Browse...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </item>
      </layout>
     </widget>
