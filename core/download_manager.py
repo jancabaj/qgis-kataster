@@ -221,6 +221,111 @@ class DownloadManager:
 
         return loaded_layers
 
+    def quick_load_layers(self, output_manager, on_refresh_filter=None):
+        """
+        Quick load layers from saved append file path.
+
+        Args:
+            output_manager: OutputManager instance to get saved path
+            on_refresh_filter: Optional callback to refresh filter combo
+        """
+        from qgis.PyQt.QtWidgets import QMessageBox
+        import os
+
+        # Get saved path
+        saved_path = output_manager.get_append_file_path()
+
+        # Validate path exists
+        if not saved_path:
+            # No saved path - prompt user to browse
+            QMessageBox.information(
+                self.iface.mainWindow(),
+                "No Saved Path",
+                "No GeoPackage file path has been saved yet.\n\n"
+                "Please select a GeoPackage file to load."
+            )
+            output_manager.browse_append_file()
+            saved_path = output_manager.get_append_file_path()
+            if not saved_path:
+                return  # User cancelled
+
+        # Check if file exists
+        if not os.path.exists(saved_path):
+            response = QMessageBox.question(
+                self.iface.mainWindow(),
+                "File Not Found",
+                f"The saved GeoPackage file was not found:\n{saved_path}\n\n"
+                "Would you like to select a different file?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if response == QMessageBox.Yes:
+                output_manager.browse_append_file()
+                saved_path = output_manager.get_append_file_path()
+                if not saved_path or not os.path.exists(saved_path):
+                    return
+            else:
+                return
+
+        # Load the layers
+        try:
+            QgsMessageLog.logMessage(f"Quick loading layers from: {saved_path}", "Kataster", Qgis.Info)
+
+            loaded_layers = self._load_gpkg_layers(saved_path)
+
+            if not loaded_layers:
+                QMessageBox.warning(
+                    self.iface.mainWindow(),
+                    "No Layers Found",
+                    f"No valid layers found in:\n{os.path.basename(saved_path)}\n\n"
+                    "The GeoPackage may be empty or corrupted."
+                )
+                return
+
+            # Build success message
+            total_features = sum(count for _, count, _ in loaded_layers)
+            refreshed_count = sum(1 for _, _, is_refresh in loaded_layers if is_refresh)
+            new_count = len(loaded_layers) - refreshed_count
+
+            if refreshed_count > 0 and new_count == 0:
+                success_msg = f"Successfully refreshed {refreshed_count} layer(s):\n\n"
+            elif refreshed_count > 0:
+                success_msg = f"Refreshed {refreshed_count}, loaded {new_count} layer(s):\n\n"
+            else:
+                success_msg = f"Successfully loaded {len(loaded_layers)} layer(s):\n\n"
+
+            for name, count, is_refresh in loaded_layers:
+                status = " (refreshed)" if is_refresh else ""
+                success_msg += f"• {name}: {count} features{status}\n"
+            success_msg += f"\nFrom: {os.path.basename(saved_path)}"
+
+            QMessageBox.information(
+                self.iface.mainWindow(),
+                "Quick Load Success",
+                success_msg
+            )
+
+            # Refresh filter combo if available
+            if on_refresh_filter:
+                on_refresh_filter()
+
+            QgsMessageLog.logMessage(
+                f"Quick load complete: {len(loaded_layers)} layers, {total_features} features",
+                "Kataster", Qgis.Success
+            )
+
+        except Exception as e:
+            import traceback
+            QgsMessageLog.logMessage(
+                f"Quick load error: {traceback.format_exc()}",
+                "Kataster", Qgis.Critical
+            )
+            QMessageBox.critical(
+                self.iface.mainWindow(),
+                "Quick Load Error",
+                f"Failed to load layers:\n{str(e)}\n\n"
+                "Check View → Panels → Log Messages (Kataster tab) for details."
+            )
+
     def worker_finished(self, vsimem_files, on_refresh_filter=None):
         """
         Called when download worker finishes.
@@ -299,6 +404,14 @@ class DownloadManager:
             if is_append_mode and on_refresh_filter:
                 on_refresh_filter()
 
+            # Auto-save the append path for quick-load functionality
+            if is_append_mode and hasattr(self, '_output_manager_ref') and self._output_manager_ref:
+                self._output_manager_ref.set_append_file_path(output_gpkg)
+                QgsMessageLog.logMessage(
+                    f"Auto-saved append path for quick load: {output_gpkg}",
+                    "Kataster", Qgis.Info
+                )
+
         except Exception as e:
             import traceback
             QgsMessageLog.logMessage(f"ERROR: {traceback.format_exc()}", "Kataster", Qgis.Critical)
@@ -314,7 +427,7 @@ class DownloadManager:
                 self.worker.wait()
                 self.worker = None
 
-    def start_download(self, cadastre_codes, output_info, layers, selection_info, on_refresh_filter=None):
+    def start_download(self, cadastre_codes, output_info, layers, selection_info, on_refresh_filter=None, output_manager=None):
         """
         Start the download process.
 
@@ -324,6 +437,7 @@ class DownloadManager:
             layers: Dict with layer selection flags
             selection_info: Dict with selection mode info
             on_refresh_filter: Optional callback to refresh filter combo after download
+            output_manager: Optional OutputManager instance for auto-saving paths
         """
         self.dlg.load_button.setEnabled(False)
         self.dlg.progress_bar.setValue(10)
@@ -350,6 +464,7 @@ class DownloadManager:
             # Store info for worker_finished
             self.current_cadastre_codes = cadastre_codes
             self.current_output_mode = output_info['mode']
+            self._output_manager_ref = output_manager  # For auto-saving append path
 
             if output_info['mode'] == katasterDialog.OUTPUT_NEW_FILE:
                 output_name = self.determine_output_name(selection_info, output_info.get('filename', ''))

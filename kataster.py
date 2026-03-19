@@ -65,11 +65,15 @@ class kataster:
     # GUI setup
     # -------------------------------------------------------------------------
 
-    def add_action(self, icon_path, text, callback, enabled_flag=True, add_to_menu=True,
+    def add_action(self, icon_or_path, text, callback, enabled_flag=True, add_to_menu=True,
                    add_to_toolbar=True, status_tip=None, whats_this=None, parent=None,
                    use_custom_toolbar=False):
         """Add a toolbar icon to the toolbar."""
-        icon = QIcon(icon_path)
+        # Accept both QIcon objects and string paths
+        if isinstance(icon_or_path, QIcon):
+            icon = icon_or_path
+        else:
+            icon = QIcon(icon_or_path)
         action = QAction(icon, text, parent)
         action.triggered.connect(callback)
         action.setEnabled(enabled_flag)
@@ -110,6 +114,19 @@ class kataster:
             callback=lambda: open_zbgis(self.iface),
             parent=self.iface.mainWindow(),
             status_tip=self.tr(u'Open zbgis.skgeodesy.sk at current map extent'),
+            add_to_menu=False,
+            use_custom_toolbar=True
+        )
+
+        # Quick-load button
+        from qgis.PyQt.QtWidgets import QStyle
+        quick_load_icon = self.iface.mainWindow().style().standardIcon(QStyle.SP_DirOpenIcon)
+        self.add_action(
+            quick_load_icon,
+            text=self.tr(u'Quick Load'),
+            callback=self.quick_load_layers,
+            parent=self.iface.mainWindow(),
+            status_tip=self.tr(u'Load layers from saved GeoPackage'),
             add_to_menu=False,
             use_custom_toolbar=True
         )
@@ -167,7 +184,8 @@ class kataster:
             output_info,
             layers,
             selection_info,
-            on_refresh_filter=self.layer_filter.refresh_combo
+            on_refresh_filter=self.layer_filter.refresh_combo,
+            output_manager=self.output_manager
         )
 
     def run(self):
@@ -199,3 +217,18 @@ class kataster:
         if saved_append_path:
             self.dlg.set_append_file_path(saved_append_path)
         self.dlg.show()
+
+    def quick_load_layers(self):
+        """Quick load layers from saved append file path."""
+        # Ensure managers are initialized
+        if self.output_manager is None:
+            self.output_manager = OutputManager(self.plugin_dir)
+
+        if self.download_manager is None:
+            self.download_manager = DownloadManager(self.plugin_dir, self.iface, None)
+
+        # Delegate to download manager
+        self.download_manager.quick_load_layers(
+            self.output_manager,
+            on_refresh_filter=self.layer_filter.refresh_combo if self.layer_filter else None
+        )

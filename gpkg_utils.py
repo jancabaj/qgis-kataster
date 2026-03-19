@@ -20,6 +20,16 @@ from qgis.core import (
     QgsPointXY
 )
 
+# QgsVectorFileWriter enum compatibility: PyQt5 (QGIS 3.x) vs PyQt6 (QGIS 4.x)
+try:
+    _VFW_NO_ERROR = QgsVectorFileWriter.WriterError.NoError
+    _VFW_CREATE_OR_OVERWRITE_FILE = QgsVectorFileWriter.ActionOnExistingFile.CreateOrOverwriteFile
+    _VFW_CREATE_OR_OVERWRITE_LAYER = QgsVectorFileWriter.ActionOnExistingFile.CreateOrOverwriteLayer
+except AttributeError:
+    _VFW_NO_ERROR = QgsVectorFileWriter.NoError
+    _VFW_CREATE_OR_OVERWRITE_FILE = QgsVectorFileWriter.CreateOrOverwriteFile
+    _VFW_CREATE_OR_OVERWRITE_LAYER = QgsVectorFileWriter.CreateOrOverwriteLayer
+
 # Slovak diacritics mapping for safe filenames
 _DIACRITIC_MAP = {
     'á': 'a', 'ä': 'a', 'č': 'c', 'ď': 'd', 'é': 'e', 'ě': 'e',
@@ -186,13 +196,13 @@ def _write_layer_to_gpkg(layer, output_gpkg, layer_name, target_crs, transform_c
         save_options.ct = QgsCoordinateTransform(layer.crs(), target_crs, transform_context)
 
     if is_first:
-        save_options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteFile
+        save_options.actionOnExistingFile = _VFW_CREATE_OR_OVERWRITE_FILE
     else:
-        save_options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
+        save_options.actionOnExistingFile = _VFW_CREATE_OR_OVERWRITE_LAYER
 
     error = QgsVectorFileWriter.writeAsVectorFormatV3(layer, output_gpkg, transform_context, save_options)
 
-    if error[0] != QgsVectorFileWriter.NoError:
+    if error[0] != _VFW_NO_ERROR:
         QgsMessageLog.logMessage(f"ERROR: Failed to write {layer_name}: {error[1]}", "Kataster", Qgis.Critical)
         return False
 
@@ -264,14 +274,14 @@ def _delete_cadastre_features(gpkg_path, cadastre_codes):
         for code, name in cadastre_codes:
             # Delete from ParcelC (nationalCadastralReference LIKE 'code_%')
             try:
-                cursor.execute(f"DELETE FROM ParcelC WHERE nationalCadastralReference LIKE '{code}_%'")
+                cursor.execute("DELETE FROM ParcelC WHERE nationalCadastralReference LIKE ?", (f'{code}_%',))
                 deleted_counts['ParcelC'] += cursor.rowcount
             except sqlite3.OperationalError:
                 pass  # Table doesn't exist yet
 
             # Delete from ParcelE (nationalCadastralReference LIKE 'code_%')
             try:
-                cursor.execute(f"DELETE FROM ParcelE WHERE nationalCadastralReference LIKE '{code}_%'")
+                cursor.execute("DELETE FROM ParcelE WHERE nationalCadastralReference LIKE ?", (f'{code}_%',))
                 deleted_counts['ParcelE'] += cursor.rowcount
             except sqlite3.OperationalError:
                 pass  # Table doesn't exist yet
@@ -279,7 +289,7 @@ def _delete_cadastre_features(gpkg_path, cadastre_codes):
             # Delete from CadastralUnit (nationalCadastalZoningReference = 'code')
             # Note: API has typo "Cadastal" instead of "Cadastral"
             try:
-                cursor.execute(f"DELETE FROM CadastralUnit WHERE nationalCadastalZoningReference = '{code}'")
+                cursor.execute("DELETE FROM CadastralUnit WHERE nationalCadastalZoningReference = ?", (code,))
                 deleted_counts['CadastralUnit'] += cursor.rowcount
             except sqlite3.OperationalError:
                 pass  # Table doesn't exist yet
