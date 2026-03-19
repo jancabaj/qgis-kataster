@@ -5,6 +5,7 @@
 [general]
 name=Kataster SR
 qgisMinimumVersion=3.0
+qgisMaximumVersion=4.99
 description=Load cadastral parcels from Slovak Cadastre via OGC API
 version=0.14
 author=jancabaj

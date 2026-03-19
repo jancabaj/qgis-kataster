@@ -3,7 +3,8 @@
 Layer filtering functionality for the Kataster plugin.
 """
 
-from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtCore import Qt, qVersion
+_QT6 = int(qVersion().split('.')[0]) >= 6
 from qgis.PyQt.QtWidgets import QComboBox, QPushButton, QLabel
 from qgis.core import QgsProject, QgsMessageLog, Qgis
 
@@ -49,7 +50,9 @@ class LayerFilter:
             # Editable combo box for cadastre filter (simple, no dropdown)
             self.filter_combo = QComboBox()
             self.filter_combo.setEditable(True)
-            self.filter_combo.setInsertPolicy(QComboBox.NoInsert)
+            self.filter_combo.setInsertPolicy(
+                QComboBox.InsertPolicy.NoInsert if _QT6 else QComboBox.NoInsert
+            )
             self.filter_combo.setMinimumWidth(200)
             self.filter_combo.lineEdit().setPlaceholderText("Type cadastre name or code...")
             self.filter_combo.setToolTip("Type cadastre name or code, then press Enter or click Apply")

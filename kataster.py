@@ -7,7 +7,8 @@ License: GNU General Public License v2+
 """
 import os.path
 
-from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
+from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, qVersion
+_QT6 = int(qVersion().split('.')[0]) >= 6
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 from qgis.core import QgsMessageLog, Qgis
@@ -120,7 +121,9 @@ class kataster:
 
         # Quick-load button
         from qgis.PyQt.QtWidgets import QStyle
-        quick_load_icon = self.iface.mainWindow().style().standardIcon(QStyle.SP_DirOpenIcon)
+        quick_load_icon = self.iface.mainWindow().style().standardIcon(
+            QStyle.StandardPixmap.SP_DirOpenIcon if _QT6 else QStyle.SP_DirOpenIcon
+        )
         self.add_action(
             quick_load_icon,
             text=self.tr(u'Quick Load'),

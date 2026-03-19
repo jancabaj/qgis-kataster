@@ -4,8 +4,10 @@ Download management and coordination for the Kataster plugin.
 """
 
 import os
+from qgis.PyQt.QtCore import qVersion
 from qgis.PyQt.QtWidgets import QMessageBox
 from qgis.core import QgsProject, QgsMessageLog, Qgis, QgsVectorLayer
+_QT6 = int(qVersion().split('.')[0]) >= 6
 
 from ..api.hierarchy import find_cadastre_code, get_cadastre_codes_by_okres, get_cadastre_codes_by_kraj
 from ..workers import DownloadWorker
@@ -256,9 +258,9 @@ class DownloadManager:
                 "File Not Found",
                 f"The saved GeoPackage file was not found:\n{saved_path}\n\n"
                 "Would you like to select a different file?",
-                QMessageBox.Yes | QMessageBox.No
+                (QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) if _QT6 else (QMessageBox.Yes | QMessageBox.No)
             )
-            if response == QMessageBox.Yes:
+            if response == (QMessageBox.StandardButton.Yes if _QT6 else QMessageBox.Yes):
                 output_manager.browse_append_file()
                 saved_path = output_manager.get_append_file_path()
                 if not saved_path or not os.path.exists(saved_path):

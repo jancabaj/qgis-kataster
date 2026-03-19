@@ -4,7 +4,8 @@ Output path and file management for the Kataster plugin.
 """
 
 import os
-from qgis.PyQt.QtCore import QSettings
+from qgis.PyQt.QtCore import QSettings, qVersion
+_QT6 = int(qVersion().split('.')[0]) >= 6
 from qgis.PyQt.QtWidgets import QFileDialog
 from qgis.core import QgsMessageLog, Qgis
 
@@ -92,7 +93,7 @@ class OutputManager:
             "Select or Create GeoPackage",
             current_path,
             "GeoPackage (*.gpkg)",
-            options=QFileDialog.DontConfirmOverwrite  # Allow selecting existing files
+            options=QFileDialog.Option.DontConfirmOverwrite if _QT6 else QFileDialog.DontConfirmOverwrite  # Allow selecting existing files
         )
         if file_path:
             # Ensure .gpkg extension
