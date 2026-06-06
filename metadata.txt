@@ -7,7 +7,7 @@ name=Kataster SR
 qgisMinimumVersion=3.0
 qgisMaximumVersion=4.99
 description=Load cadastral parcels from Slovak Cadastre via OGC API
-version=0.14
+version=0.15
 author=jancabaj
 email=jan807931@gmail.com
 
@@ -36,7 +36,8 @@ repository=https://github.com/jancabaj/qgis-kataster
 
 hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
-changelog=0.14 - QGIS 4.0 compatibility (PyQt6 support), added Quick Load button to load layers from saved GeoPackage
+changelog=0.15 - Fix incomplete downloads for large cities: spatial bbox tiling (4x4 grid) replaces offset-based pagination, eliminating server timeouts at large offsets; progress updates during download; error file cap (max 3 per run)
+    0.14 - QGIS 4.0 compatibility (PyQt6 support), added Quick Load button to load layers from saved GeoPackage
     0.13 - Added okres/kraj download (download entire districts or regions), toolbar filter for downloaded cadastres, append mode to add cadastres to existing GPKG, custom output filename, ESRI compatible WKT, fixed Windows temp file cleanup, code refactored for better maintainability
     0.12 - Fixed coordinate accuracy issue: Changed source CRS from EPSG:4258 to EPSG:4326, bundled official SK GKU transformation with grid file (sk_gku_JTSK03_to_JTSK.tif), plugin now works independently without manual QGIS transformation setup
     0.11 - improved UI

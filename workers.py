@@ -19,6 +19,10 @@ class DownloadWorker(QThread):
     finished = pyqtSignal(list)
     # Signal for multi-cadastre progress: (current_index, total_count, cadastre_name)
     multi_progress = pyqtSignal(int, int, str)
+    # Signal for per-batch progress during a single cadastre download: (features_so_far,)
+    batch_progress = pyqtSignal(int)
+    # Signal for status label updates (e.g. "Retrying 1/3...")
+    status_update = pyqtSignal(str)
 
     def __init__(self, cadastre_codes, output_name, fetch_parcel_c, fetch_parcel_e, fetch_zoning, plugin_dir=None):
         """
@@ -96,7 +100,7 @@ class DownloadWorker(QThread):
     def run(self):
         """Run the download in a separate thread"""
         try:
-            callback = DownloadCallbackQt(self.progress, self.error)
+            callback = DownloadCallbackQt(self.progress, self.error, self.batch_progress, self.status_update)
             total_cadastres = len(self.cadastre_codes)
             error_logs_dir = self._get_error_logs_dir()
 
@@ -209,13 +213,26 @@ class DownloadWorker(QThread):
 class DownloadCallbackQt(download_cadastre.DownloadCallback):
     """Callback that emits Qt signals"""
 
-    def __init__(self, progress_signal, error_signal):
+    def __init__(self, progress_signal, error_signal, batch_progress_signal=None, status_signal=None):
         super().__init__()
         self.progress_signal = progress_signal
         self.error_signal = error_signal
+        self.batch_progress_signal = batch_progress_signal
+        self.status_signal = status_signal
+        self._last_feature_count = 0
 
     def on_progress(self, message):
         self.progress_signal.emit(message)
 
     def on_error(self, message):
         self.error_signal.emit(message)
+
+    def on_batch_complete(self, total_features):
+        self._last_feature_count = total_features
+        if self.batch_progress_signal:
+            self.batch_progress_signal.emit(total_features)
+
+    def on_status(self, message):
+        if self.status_signal:
+            feat_str = f"{self._last_feature_count:,} features — " if self._last_feature_count else ""
+            self.status_signal.emit(f"{feat_str}{message}")

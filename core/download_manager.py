@@ -168,6 +168,18 @@ class DownloadManager:
         self.dlg.progress_bar.setValue(progress)
         self.dlg.status_label.setText(f"Downloading {current}/{total}: {name}")
 
+    def worker_batch_progress(self, total_features):
+        """Update status label after each downloaded batch so the user sees activity."""
+        self.dlg.status_label.setText(
+            f"Downloading {self.current_query}... {total_features:,} features"
+        )
+
+    def worker_status_update(self, message):
+        """Update status label with retry/error state messages."""
+        self.dlg.status_label.setText(
+            f"Downloading {self.current_query}... {message}"
+        )
+
     def _find_existing_layer(self, gpkg_path, layer_name):
         """
         Find an existing layer in the project that uses the same GPKG source.
@@ -501,6 +513,8 @@ class DownloadManager:
             self.worker.error.connect(self.worker_error)
             self.worker.finished.connect(lambda vsimem: self.worker_finished(vsimem, on_refresh_filter))
             self.worker.multi_progress.connect(self.worker_multi_progress)
+            self.worker.batch_progress.connect(self.worker_batch_progress)
+            self.worker.status_update.connect(self.worker_status_update)
             self.worker.start()
 
             self.dlg.status_label.setText(f"Downloading {display_name}...")
